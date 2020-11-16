@@ -20,8 +20,10 @@ class Net(nn.Module):
 
 class AE(object):
     def __init__(self, input_dim, hidden_dim, compress_dim, beta):
+        self.compress_dim = compress_dim
+        self.beta = beta
         self.compress_net = Net(input_dim, hidden_dim, compress_dim)
-        self.retrieve_net = Net(compress_dim, hidden_dim, input_dim)
+        self.retrieve_net = Net(int(compress_dim/2), hidden_dim, input_dim)
         self.optimiser = optim.Adam(list(self.compress_net.parameters())+list(self.retrieve_net.parameters()))
         self.criterion = nn.MSELoss()
 
@@ -46,11 +48,31 @@ class AE(object):
     def loss(self, dataset):
         dataset = torch.FloatTensor(dataset)
         compressed = self.compress(dataset)
-        mean, std = torch.split(compressed, [len-1,1])
+        l = self.compress_dim
+        mean, std = torch.split(compressed, [int(l/2),int(l/2)], dim = 1)
         std = torch.exp(std)
-        epsilon = torch.random_normal(mean.shape[0])
+        epsilon = torch.randn(mean.shape[0]).reshape([-1,1])
         z = mean + std * epsilon
         retrieved = self.retrieve(z)
         loss = self.criterion(dataset, retrieved)
-        KLdiv = 0.5 * (torch.square(mean) + torch.square(std) - 2.0 * torch.log(std + epsilon) - 1.0)
+        KLdiv = self.KL(mean, std)
+        loss= loss - self.beta * KLdiv
         return loss
+    
+    def KL(self, mean, std):
+        KLdiv = 0.5 * (torch.square(mean) + torch.square(std) - 2.0 * torch.sum(torch.log(std)) - 1.0)
+        return torch.sum(KLdiv)
+    
+    def MSE(self, dataset):
+        with torch.no_grad():
+            dataset = torch.FloatTensor(dataset)
+            compressed = self.compress(dataset)
+            l = self.compress_dim
+            mean, std = torch.split(compressed, [int(l/2),int(l/2)], dim = 1)
+            std = torch.exp(std)
+            epsilon = torch.randn(mean.shape[0]).reshape([-1,1])
+            z = mean + std * epsilon
+            retrieved = self.retrieve(z)
+            loss = self.criterion(dataset, retrieved)
+        return loss
+        
