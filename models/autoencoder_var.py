@@ -60,7 +60,7 @@ class AE(object):
         return loss
     
     def KL(self, mean, std):
-        KLdiv = 0.5 * (torch.square(mean) + torch.square(std) - 2.0 * torch.sum(torch.log(std)) - 1.0)
+        KLdiv = 0.5 * (torch.square(mean) + torch.square(std) - 2.0 * torch.sum(torch.log(std + 1e-10)) - 1.0)
         return torch.sum(KLdiv)
     
     def MSE(self, dataset):
