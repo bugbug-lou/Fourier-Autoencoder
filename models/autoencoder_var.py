@@ -18,7 +18,7 @@ class Net(nn.Module):
         return output
 
 
-class AE(object):
+class VAE(object):
     def __init__(self, input_dim, hidden_dim, compress_dim, beta):
         self.compress_dim = compress_dim
         self.beta = beta
