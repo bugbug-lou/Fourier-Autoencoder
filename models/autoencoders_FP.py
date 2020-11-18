@@ -36,7 +36,7 @@ class Net(nn.Module):
         return output
 
 
-class AE(object):
+class FAE(object):
     def __init__(self, dataset, input_dim, hidden_dim, compress_dim,thres):
         self.compress_net = Net(input_dim, hidden_dim, compress_dim)
         self.retrieve_net = Net(compress_dim, hidden_dim, input_dim)
