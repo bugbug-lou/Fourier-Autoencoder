@@ -144,46 +144,46 @@ for i in range(3):
         optimizers.append(optim.Adam(models[i].parameters(), lr=0.1))
         
 def process_t(iter, inputs, labels):
-    Output = []
+    Outputs = []
     with torch.no_grad():
         a1 = CAE1.compress(inputs).reshape([-1,compress_dim]).clone().detach()
         a2 = VCAE1.compress(inputs)[:,0:compress_dim].reshape([-1,compress_dim]).clone().detach()
         a3 = FCAE1.compress(inputs).reshape([-1,compress_dim]).clone().detach()
-        Output.append(Variable(a1))
-        Output.append(Variable(a2))
-        Output.append(Variable(a3))
+        Outputs.append(Variable(a1,requires_grad=False))
+        Outputs.append(Variable(a2,requires_grad=False))
+        Outputs.append(Variable(a3,requires_grad=False))
         
-    err2 = get_error(models[0],Output[0], labels, bs)
-    err3 = get_error(models[1], Output[1], labels, bs)
-    err4 = get_error(models[2], Output[2],labels, bs)
+    err2 = get_error(models[0],Outputs[0], labels, bs)
+    err3 = get_error(models[1], Outputs[1], labels, bs)
+    err4 = get_error(models[2], Outputs[2],labels, bs)
  
     return err2,err3, err4
 
 def process(iter, inputs, labels, models = models):
 
-    Output = []
+    Outputs = []
     with torch.no_grad():
         a1 = CAE1.compress(inputs).reshape([-1,compress_dim]).clone().detach()
         a2 = VCAE1.compress(inputs)[:,0:compress_dim].reshape([-1,compress_dim]).clone().detach()
         a3 = FCAE1.compress(inputs).reshape([-1,compress_dim]).clone().detach()
-    Output.append(a1)
-    Output.append(a2)
-    Output.append(a3)
+        Outputs.append(a1,requires_grad=False)
+        Outputs.append(a2,requires_grad=False)
+        Outputs.append(a3,requires_grad=False)
     
     for j in range(iter):
         #train(models[0], loss, optimizers[0], XTrain, YTrains[num])
         #elif k == 1:
-        train(models[0], loss, optimizers[0], Output[0], labels)
+        train(models[0], loss, optimizers[0], Outputs[0], labels)
         #elif k == 2:
-        train(models[1], loss, optimizers[1], Output[1], labels)
+        train(models[1], loss, optimizers[1], Outputs[1], labels)
         #elif k == 3:
-        train(models[2], loss, optimizers[2], Output[2], labels)
+        train(models[2], loss, optimizers[2], Outputs[2], labels)
       
-    err2 = get_error(models[0],Output[0], labels, bs)
+    err2 = get_error(models[0],Outputs[0], labels, bs)
 
-    err3 = get_error(models[1], Output[1], labels, bs)
+    err3 = get_error(models[1], Outputs[1], labels, bs)
 
-    err4 = get_error(models[2], Output[2],labels, bs)
+    err4 = get_error(models[2], Outputs[2],labels, bs)
 
     return err2,err3, err4
     
@@ -197,7 +197,7 @@ for epoch in range(number_epoches):  # loop over the dataset multiple times
         
 
         # wrap them in Variable
-        inputs, labels = Variable(inputs), Variable(labels)
+        inputs, labels = Variable(inputs, requires_grad=False), Variable(labels,requires_grad=False)
         #inputs= Variable(inputs)
 
         # forward + backward + optimize
