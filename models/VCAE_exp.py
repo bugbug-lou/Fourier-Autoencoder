@@ -8,6 +8,14 @@ import torchvision.datasets as datasets
 from torch.autograd import Variable
 import math
 import torchvision.transforms as transforms
+import random
+from matplotlib import pyplot as plt
+import multiprocessing
+from lempel_ziv_complexity import lempel_ziv_complexity
+import collections
+import argparse
+import pickle
+import os.path
 
 bs = 50 #batch_size
 transform = transforms.Compose(
@@ -135,7 +143,7 @@ class VCAE(object):
         return loss
         
 VCAEs = []
-MC_num = 10
+MC_num = 10 #randomly initialize MC_num amount of VCAEs
 compress_dim = 2
 for i in range(MC_num):
     VCAEs.append(VCAE([28,28,1],compress_dim = compress_dim, beta = 0.01)) #beta = 0.01 is chosen based on grid search not shown in this code
@@ -177,3 +185,185 @@ def train(model, epoches_num): #train autoencoder, with epoches_num: number of l
                 running_loss = 0.0
                 running_fp = 0.0
           
+i = 0
+for model in VCAEs:
+    i = i+1
+    print('this is the ' + str(i) + ' model')
+    train(model, 1) #train each autoencoder for 1 loop over training data, can modify to achieve better MSE loss
+
+
+# The following is initialization and training of neural networks
+compress_dim = 2
+loss = nn.CrossEntropyLoss()
+neu = 40
+mean = 0
+scale = 1
+VCAEs1 = VCAEs #just a minor adjustment to fit the code...
+
+
+def Output(x):
+    x = x.reshape([-1,10])
+    pred = torch.max(x, dim = 1)[1]
+    return pred
+
+def Train(model, loss, optimizer, inputs, labels):
+    model.train()
+    inputs = Variable(inputs, requires_grad=False)
+    labels = Variable(labels, requires_grad=False)
+    # reset gradient
+    optimizer.zero_grad()
+    # forward loop
+    logits = model.forward(inputs)
+    output = loss.forward(logits, labels)
+    # backward
+    output.backward()
+    optimizer.step()
+    return output.item()
+
+
+def get_error(model, inputs, labels, d):
+    model.eval()
+    inputs = Variable(inputs, requires_grad=False)
+    labels = Variable(labels, requires_grad=False)
+    logits = model.forward(inputs)
+    predicts = Output(logits)
+    a = predicts.shape[0]
+    k = 0
+    for i in range(a):
+        if predicts[i] == labels[i]:
+            k = k+1
+
+    return 1 - k / d
+
+
+def predict(model, inputs):
+    model.eval()
+    inputs = Variable(inputs, requires_grad=False)
+    logits = model.forward(inputs)
+    return logits
+
+models = [] #3  models,baseline, FP, VAE
+optimizers = []
+#errors1, errors2, errors3 = [], [], []
+#terrors1,terrors2,terrors3,terrors4 = [], [], [], []
+loss = nn.CrossEntropyLoss()
+neu = 40
+mean = 0
+scale = 1
+compress_dim = 2
+num_models = 10
+
+for i in range(num_models):
+    #i = i + 1
+    models.append(torch.nn.Sequential())
+    models[i].add_module('FC1', torch.nn.Linear(compress_dim, neu))
+    models[i].add_module('relu1', torch.nn.ReLU())
+    models[i].add_module('FC2', torch.nn.Linear(neu, neu))
+    models[i].add_module('relu2', torch.nn.ReLU())
+    models[i].add_module('FC3', torch.nn.Linear(neu, 10))
+    #if i == 0:
+    with torch.no_grad():
+        torch.nn.init.normal_(models[i].FC1.weight, mean=mean, std=scale)
+        torch.nn.init.normal_(models[i].FC2.weight, mean=mean, std=scale)
+        torch.nn.init.normal_(models[i].FC3.weight, mean=mean, std=scale)
+    optimizers.append(optim.Adam(models[i].parameters(), lr=0.1))
+    #else:
+        #with torch.no_grad():
+            #models[i].FC1.weight = torch.nn.Parameter(models[0].FC1.weight.clone().detach())
+            #models[i].FC2.weight = torch.nn.Parameter(models[0].FC2.weight.clone().detach())
+            #models[i].FC3.weight = torch.nn.Parameter(models[0].FC3.weight.clone().detach())
+        #optimizers.append(optim.Adam(models[i].parameters(), lr=0.1))
+        
+def process_t(inputs, labels):
+    # the process for prediction on test data
+    Outputs = []
+    errs = []
+    with torch.no_grad():
+        for i in range(num_models):
+        
+            a = VCAEs1[i].compress(inputs)[:, 0:compress_dim].reshape([-1,compress_dim]).clone().detach()
+        
+            Outputs.append(Variable(a,requires_grad=False))
+            
+
+
+    for i in range(num_models):
+        errs.append(get_error(models[i],Outputs[i], labels, bs))
+   
+ 
+    return errs
+
+def process(iter, inputs, labels, models = models):
+    # the process for training on training dataset
+    Outputs = []
+    errs = []
+    with torch.no_grad():
+        for i in range(num_models):
+        
+            a = VCAEs1[i].compress(inputs)[:, 0:compress_dim].reshape([-1,compress_dim]).clone().detach()
+        
+            Outputs.append(Variable(a,requires_grad=False))
+    
+    for i in range(num_models):
+        errs.append(get_error(models[i],Outputs[i], labels, bs))
+    
+    for j in range(iter):
+        #train(models[0], loss, optimizers[0], XTrain, YTrains[num])
+        #elif k == 1:
+        for i in range(num_models):
+            Train(models[i], loss, optimizers[i], Outputs[i], labels)
+            err = get_error(models[i],Outputs[i], labels, bs)
+            if err == 0:
+                break
+        
+    
+    return errs
+    
+number_epoches = 1
+iter = 10  #This is generally recommended, as too large an iter will cause over training
+for epoch in range(number_epoches):  # loop over the dataset multiple times 
+    #errs1, errs2, errs3 = [], [], []
+    for i, data in enumerate(mnist_trainloader, 0):
+        # get the inputs
+        inputs, labels = data
+        
+
+        # wrap them in Variable
+        inputs, labels = Variable(inputs, requires_grad=False), Variable(labels,requires_grad=False)
+        #inputs= Variable(inputs)
+
+        # forward + backward + optimize
+        errs = process(iter, inputs, labels)
+        print(errs)
+        if i%100 == 99:
+            print(str(i) + ' complete ')
+    
+    number_epoches = 1
+    #iter = 50
+    for epoch in range(number_epoches):  # loop over the dataset multiple times 
+        terrs = []
+        for i in range(num_models):
+            terrs.append([])
+        for i, data in enumerate(mnist_testloader, 0):
+            # get the inputs
+            inputs, labels = data
+
+
+            # wrap them in Variable
+            inputs, labels = Variable(inputs, requires_grad=False), Variable(labels,requires_grad=False)
+            #inputs= Variable(inputs)
+
+            # forward + backward + optimize
+            terr = process_t(inputs, labels)
+            for j in range(num_models):
+                terrs[j].append(terr[j])
+            if i%100 == 99:
+                print(str(i) + ' complete ')
+                #print(errs[0])
+            
+    a = []  #calculate the mean error the prediction method achieves on the test dataset
+    for i in range(num_models):
+        a.append(sum(terrs[i])/200)
+    print('the mean error is: ')
+    print(a)
+
