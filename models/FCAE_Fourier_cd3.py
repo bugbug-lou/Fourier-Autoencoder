@@ -380,12 +380,12 @@ class Fourier(object):
         return pred
         
 number_epoches = 1
-dim = 2
-thres = 15
+dim = 3
+thres = 5
 Four = Fourier(dim = dim, thres = thres, intl = 1)
 loss = nn.CrossEntropyLoss()
 num_models = 10
-compress_dim = 2
+compress_dim = 3
 
 #device = torch.device('cuda')
 #device_c = torch.device('cpu')
