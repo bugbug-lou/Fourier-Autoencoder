@@ -84,8 +84,10 @@ def get_all_axis(dim, thres):
     return vecs1
 
 def get_fc(x, y, k):
-    ## x: input, y: output, k:frequency matrix (data dim first), w: weight given by the frequency axes
-    ## this function gives the fourier coefficient corresponding to frequencies given in k of the map from x to y,
+    ## x: input (bacth size * compress dimension), y: output (batch size * label dimension (1)), k:frequency matrix (compress dimension * total number of frequency vectors chosen)
+    ## this function first calculates the fourier coefficient of the map from x to y along the fourier frequency given in k, then it calculates the  sum
+    ## of the squared fourier coefficients weighted by the magnitude of its corresponding fourier frequency vector (FP-norm)
+    ## in the code, w is the weight for fourier coefficients 
     ## this is in keeping with the definition of FP norm in the original article
     bs,cd = x.shape
     k = k.reshape([cd,-1]) #cd*num of frequencies
@@ -157,11 +159,9 @@ class FCAE(object):
 
     #Use this method to compress a dataset.
     def compress(self, data):
-
         return self.compress_net(data)
 
     def retrieve(self, data):
-
         return self.retrieve_net(data)
 
     #Dataset is a collection of data.
@@ -183,14 +183,14 @@ class FCAE(object):
         return loss
 
     def FP(self, compressed, labels):
-        ## thres: the axis entry maximum value
-        ## k: specifying the function
-        ## get_all: function to be completed
+        ## labels: the labels accompanying the training set
+        ## returns the approximated FP norm of the map: compressed data -> labels
         FP_loss = get_fc(compressed,labels,self.axes)
         return torch.sqrt(FP_loss)
 
 
     def MSE(self, dataset):
+        ## calculate MSE loss for printing during training of the autoencoders
         with torch.no_grad():
             #dataset = torch.FloatTensor(dataset).to(device)
             compressed = self.compress(dataset)
@@ -199,7 +199,7 @@ class FCAE(object):
         return loss
 
 def train(model, epoches_num, beta):
-    ## model is an instance of a VFCAE autoencoder, beta is a hyerparameter
+    ## model is an instance of a FCAE autoencoder, beta is a hyerparameter, epoches_num: training epoches
     for epoch in range(epoches_num):  # loop over the dataset multiple times 
 
         running_loss = 0.0
@@ -227,7 +227,7 @@ def train(model, epoches_num, beta):
 
             # print statistics
             running_loss += loss.item()
-            if i % 10 == 9:    # print every 2000 mini-batches
+            if i % 10 == 9:    
                 print(str(i) + 'complete!')
                 print(running_loss/10)
                 print(running_fp/10)
