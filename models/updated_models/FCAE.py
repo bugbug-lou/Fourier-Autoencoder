@@ -379,7 +379,7 @@ for t in range(MC_num):
         print(i)
         train(FCAE,2, betas[t])
         
-    number_epoches = 10
+    number_epoches = 5
     iter = 10
     plot_data = []
     models = [] #3  models,baseline, FP, VAE
