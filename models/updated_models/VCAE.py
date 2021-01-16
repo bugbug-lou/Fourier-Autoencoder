@@ -14,7 +14,7 @@ import multiprocessing
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-bs = 1000 #batch_size
+bs = 2000 #batch_size
 transform = transforms.Compose(
     [transforms.ToTensor()])
 
@@ -187,8 +187,6 @@ neu = 40
 mean = 0
 scale = 1
 
-
-
 def Output(x):
     x = x.reshape([-1,10])
     pred = torch.max(x, dim = 1)[1]
@@ -278,20 +276,15 @@ def process(iter, inputs, labels, models):
     
 
 MC_num = 5
-betas = [0.0001, 0.001, 0.002, 0.003, 0.003]
-loss = nn.CrossEntropyLoss()
-neu = 40
-mean = 0
-scale = 1
-#num_nn = 5
+betas = [0.0001, 0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.003, 0.003, 0.003, 0.003]
 plot_datas = []
 for t in range(MC_num):
   i = 0
   for VCAE in VCAEs:
       i = i+1
       print(i)
-      train(VCAE,2, betas[t])
-      #train(VCAE,2, betas[t])
+      train(VCAE,2, betas[2 * t])
+      train(VCAE, 2, betas[2*t + 1])
   models = [] #3  models,baseline, FP, VAE
   optimizers = []
   plot_data = []
@@ -368,6 +361,10 @@ for t in range(MC_num):
           k = 10000/bs
           a.append(sum(terrs[i])/k)
       plot_data.append(sum(a)/num_models)
+      print('the mean error is')
+      print(a)
+      print(sum(a)/10)
+
   
   del models
   del optimizers
